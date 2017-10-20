@@ -55,7 +55,7 @@ execute(#{subtasks := Subtasks, id := TaskID, data := #{description := Desc}}, I
 
 
 
-execute_task(#{id := TaskID, data := Data}, C) ->
+execute_task(#{data := Data}, C) ->
     MethodTemplate = maps:get(methodTemplate, Data, "GET"),
     HostTemplate = maps:get(hostTemplate, Data, "localhost"),
     PortTemplate = maps:get(portTemplate, Data, "80"),
@@ -70,22 +70,22 @@ execute_task(#{id := TaskID, data := Data}, C) ->
     Body = template:replace(BodyTemplate, C),
     Method = template:replace(MethodTemplate, C),
 
-    do_request(Method, Host, Port, Path, Headers, Body, TaskID).
+    do_request(Method, Host, Port, Path, Headers, Body).
 
 
 
 
 
-do_request(Method, Host, Port, Path, Headers, Body, TaskID) ->
+do_request(Method, Host, Port, Path, Headers, Body) ->
     Scheme = case Port of
                  80 -> "http";
                  _ -> "https"
              end,
     lager:info("     request: ~s ~s://~s:~p~s", [Method, Scheme, Host, Port, Path]),
-    do_request_internal(Method, Host, Port, Path, Headers, Body, TaskID).
+    do_request_internal(Method, Host, Port, Path, Headers, Body).
 
 
-do_request_internal("GET", Host, Port, Path, Headers, _Body, _TaskID) ->
+do_request_internal("GET", Host, Port, Path, Headers, _Body) ->
     {ok, ConnPid} = gun:open(Host, Port),
     ParsedHeaders = parse_headers(Headers),
     StreamRef = gun:get(ConnPid, Path, ParsedHeaders),
