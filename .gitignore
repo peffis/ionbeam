@@ -1,0 +1,9 @@
+deps
+*~
+ebin
+.erlang.mk
+template.d
+cover
+eunit.coverdata
+ionbeam.d
+_rel

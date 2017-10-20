@@ -1,0 +1,16 @@
+{application, ionbeam,
+ [
+  {description, ""},
+  {vsn, "0.9"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib,
+		  lager,
+		  gun
+                 ]},
+  {mod, { ionbeam_app, []}},
+  {included_applications, [template]},
+  {modules, []},
+  {env, []}
+ ]}.
