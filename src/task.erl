@@ -26,7 +26,7 @@ add_subtask(Child, #{id := PID, subtasks := Subs} = Parent) ->
 
 %% execute runs a task given a context, if successful it returns the new context or throws an {error, Reason, Stack} tuple
 execute(#{subtasks := [], id := TaskID, data := #{description := Desc}} = T, Context) ->
-    lager:info("   running ~s [\"~s\"]", [TaskID, Desc]),
+    lager:info("   running [~s] [~s]", [Desc, TaskID]),
 
     try
         Response = execute_task(T, Context),
@@ -43,7 +43,7 @@ execute(#{subtasks := [], id := TaskID, data := #{description := Desc}} = T, Con
 
 
 execute(#{subtasks := Subtasks, id := TaskID, data := #{description := Desc}}, InitialCtx) ->
-    lager:info("running ~s [\"~s\"]", [TaskID, Desc]),
+    lager:info("running [~s] [~s]", [Desc, TaskID]),
 
     try
         lists:foldl(fun(T, Ctx) -> execute(T, Ctx) end, InitialCtx, Subtasks)
@@ -82,14 +82,28 @@ do_request(Method, Host, Port, Path, Headers, Body) ->
                  _ -> "https"
              end,
     lager:info("     request: ~s ~s://~s:~p~s", [Method, Scheme, Host, Port, Path]),
-    do_request_internal(Method, Host, Port, Path, Headers, Body).
-
-
-do_request_internal("GET", Host, Port, Path, Headers, _Body) ->
     {ok, ConnPid} = gun:open(Host, Port),
     ParsedHeaders = parse_headers(Headers),
-    StreamRef = gun:get(ConnPid, Path, ParsedHeaders),
+    StreamRef = make_request(Method, ConnPid, Path, ParsedHeaders, Body),
     receive_response(StreamRef).
+
+make_request("GET", ConnPid, Path, Headers, _Body) ->
+    gun:get(ConnPid, Path, Headers);
+make_request("POST", ConnPid, Path, Headers, Body) ->
+    gun:post(ConnPid, Path, Headers, Body);
+make_request("PUT", ConnPid, Path, Headers, Body) ->
+    gun:post(ConnPid, Path, Headers, Body);
+make_request("DELETE", ConnPid, Path, Headers, _) ->
+    gun:delete(ConnPid, Path, Headers);
+make_request(Method, ConnPid, _, _, _) ->
+    gun:close(ConnPid),
+    throw({error, {http_method_not_implemented, Method}, []}).
+
+
+
+
+
+
 
 receive_response(StreamRef) ->
     receive
@@ -100,7 +114,7 @@ receive_response(StreamRef) ->
             receive_data(ConnPid, Status, Headers, StreamRef, []);
         {'DOWN', _MRef, process, _ConnPid, Reason} ->
             throw({error, Reason})
-    after 1000 ->
+    after 10000 ->
             throw({error, timeout})
     end.
 
@@ -159,14 +173,16 @@ validate_body(Body, #{id := TID, data := Data}, Ctx) ->
     case maps:get(bodyConstraints, Data, ignore_body) of
         ignore_body -> Ctx;
 
-        BodyTemplate ->
+        #{matchBody := BodyTemplate} ->
             case template:match(BodyTemplate, Body) of
                 {error, Reason} ->
                     throw({error, Reason, [{TID, []}]});
 
                 Ctx2 ->
                     merge_contexts(Ctx2, Ctx, TID)
-            end
+            end;
+
+        _ -> Ctx
     end.
 
 
