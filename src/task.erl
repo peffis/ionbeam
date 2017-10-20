@@ -1,7 +1,7 @@
 -module(task).
 
 -compile([{parse_transform, lager_transform}]).
--export([create/1, create/2, add_subtask/2, execute/2]).
+-export([create/1, create/2, add_subtask/2, execute/2, show_result/2]).
 
 
 create(Data) when is_map(Data) ->
@@ -23,10 +23,32 @@ add_subtask(Child, #{id := PID, subtasks := Subs} = Parent) ->
     task_handler:update(PID, NewParent),
     NewParent.
 
+show_result(#{data := #{description := D}, id := TID, subtasks := ST}, ResultCtx) ->
+    Indentation = case ST of
+                      [] ->
+                          "   ";
+                      _ -> ""
+                  end,
+
+    lager:info("~scompleted \"~s\" (~s...)", [Indentation, D, lists:sublist(binary_to_list(TID), 12)]),
+    show_result(Indentation, maps:to_list(ResultCtx));
+
+show_result(Indentation, TupleList) when is_list(Indentation), is_list(TupleList) ->
+    lists:foreach(fun({K, V}) -> lager:info("~s~s~s => ~s", [Indentation, Indentation, K, V]) end,
+                  lists:filter(fun({K, _V}) ->
+                                       [First | _] = K,
+                                       case First of
+                                           $_ ->
+                                               false;
+                                           _ -> true
+                                       end
+                               end, TupleList)).
+
+
 
 %% execute runs a task given a context, if successful it returns the new context or throws an {error, Reason, Stack} tuple
 execute(#{subtasks := [], id := TaskID, data := #{description := Desc}} = T, Context) ->
-    lager:info("   running [~s] [~s]", [Desc, TaskID]),
+    lager:info("   running \"~s\" (~s...)", [Desc, lists:sublist(binary_to_list(TaskID), 12)]),
 
     try
         Response = execute_task(T, Context),
@@ -43,7 +65,7 @@ execute(#{subtasks := [], id := TaskID, data := #{description := Desc}} = T, Con
 
 
 execute(#{subtasks := Subtasks, id := TaskID, data := #{description := Desc}}, InitialCtx) ->
-    lager:info("running [~s] [~s]", [Desc, TaskID]),
+    lager:info("running \"~s\" (~s...)", [Desc, lists:sublist(binary_to_list(TaskID), 12)]),
 
     try
         lists:foldl(fun(T, Ctx) -> execute(T, Ctx) end, InitialCtx, Subtasks)
