@@ -56,12 +56,12 @@ execute(#{subtasks := Subtasks, id := TaskID, data := #{description := Desc}}, I
 
 
 execute_task(#{id := TaskID, data := Data}, C) ->
-    #{methodTemplate := MethodTemplate,
-      hostTemplate := HostTemplate,
-      portTemplate := PortTemplate,
-      pathTemplate := PathTemplate,
-      headersTemplate := HeadersTemplate,
-      bodyTemplate := BodyTemplate} = Data,
+    MethodTemplate = maps:get(methodTemplate, Data, "GET"),
+    HostTemplate = maps:get(hostTemplate, Data, "localhost"),
+    PortTemplate = maps:get(portTemplate, Data, "80"),
+    PathTemplate = maps:get(pathTemplate, Data, "/"),
+    HeadersTemplate = maps:get(headersTemplate, Data, "\r\n"),
+    BodyTemplate = maps:get(bodyTemplate, Data, ""),
 
     Host = template:replace(HostTemplate, C),
     Port = list_to_integer(template:replace(PortTemplate, C)),
@@ -136,7 +136,8 @@ validate(#{status := Status, headers := Headers, body := Body}, #{id := _TID} = 
     ContextAfterBodyValidation = validate_body(Body, T, ContextAfterHeadersValidation),
     ContextAfterBodyValidation.
 
-validate_status(Status, #{id := TID, data := #{statusConstraints := SC}}, Ctx) ->
+validate_status(Status, #{id := TID, data := Data}, Ctx) ->
+    SC = maps:get(statusConstraints, Data, [200]),
     case lists:member(Status, SC) of
         true ->
             Ctx;
@@ -146,21 +147,26 @@ validate_status(Status, #{id := TID, data := #{statusConstraints := SC}}, Ctx) -
 
 validate_headers([], _, Ctx) ->
     Ctx;
-validate_headers([H | Headers], #{id := TID, data := #{headersConstraints := HC}} = T, Ctx) ->
+validate_headers([H | Headers], #{id := TID, data := Data} = T, Ctx) ->
+    HC = maps:get(headersConstraints, Data, #{matchLines => []}),
     #{matchLines := ML} = HC,
     Ctx2 = match_header(H, ML, Ctx, TID),
     ok = validate_matched_values(Ctx2, HC, TID),
     validate_headers(Headers, T, merge_contexts(Ctx2, Ctx, TID)).
 
-validate_body(_Body, #{data := #{bodyConstraints := #{matchBody := ""}}}, Ctx) ->
-    Ctx;
-validate_body(Body, #{id := TID, data := #{bodyConstraints := #{matchBody := BodyTemplate}}}, Ctx) ->
-    case template:match(BodyTemplate, Body) of
-        {error, Reason} ->
-            throw({error, Reason, [{TID, []}]});
 
-        Ctx2 ->
-            merge_contexts(Ctx2, Ctx, TID)
+validate_body(Body, #{id := TID, data := Data}, Ctx) ->
+    case maps:get(bodyConstraints, Data, ignore_body) of
+        ignore_body -> Ctx;
+
+        BodyTemplate ->
+            case template:match(BodyTemplate, Body) of
+                {error, Reason} ->
+                    throw({error, Reason, [{TID, []}]});
+
+                Ctx2 ->
+                    merge_contexts(Ctx2, Ctx, TID)
+            end
     end.
 
 
