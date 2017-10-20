@@ -1,61 +1,7 @@
 -module(task).
 
 -compile([{parse_transform, lager_transform}]).
--export([create/1, create/2, add_subtask/2, execute/2, tester/0]).
-
-tester() ->
-    Task1 = create(#{
-                      description => "GET API docs",
-                      methodTemplate => "GET",
-                      hostTemplate => "stagecast.se",
-                      portTemplate => "443",
-                      pathTemplate => "/api/",
-                      headersTemplate => "\r\n",
-                      bodyTemplate => "",
-                      statusConstraints => [200],
-                      headersConstraints => #{
-                        matchLines => [
-                                       "Content-Type: $(_CONTENT_TYPE)",
-                                       "Server: $(SERVER)",
-                                       "Content-Length: $(_CONTENT_LENGTH)"
-                                      ],
-                        "_CONTENT_TYPE" => "text/html"
-                       }
-                    }),
-
-    Task2 = create(#{
-                      description => "GET /api2",
-                      methodTemplate => "GET",
-                      hostTemplate => "stagecast.se",
-                      portTemplate => "443",
-                      pathTemplate => "/api2/",
-                      headersTemplate => "\r\n",
-                      bodyTemplate => "",
-                      statusConstraints => [200, 301],
-                      headersConstraints => #{
-                        matchLines => [
-                                       "Content-Type: $(_CONTENT_TYPE)",
-                                       "Server: $(SERVER)",
-                                       "Content-Length: $(_CONTENT_LENGTH)",
-                                       "Host: $(HOST)"
-                                      ],
-                        "_CONTENT_TYPE" => "text/png"
-                       }
-                    }),
-
-    Parent = create(#{description => "The two GET requests"},
-                    [Task1, Task2]),
-
-    try
-        Res = execute(Parent, #{}),
-        #{id := TID} = Parent,
-        lager:info("Task ~s completed OK|  [~p]", [TID, Res])
-
-    catch
-        throw:{error, Reason, Stack} ->
-            lager:error("~p ~p", [Reason, Stack])
-    end.
-
+-export([create/1, create/2, add_subtask/2, execute/2]).
 
 
 create(Data) when is_map(Data) ->
@@ -105,10 +51,7 @@ execute(#{subtasks := Subtasks, id := TaskID, data := #{description := Desc}}, I
     catch
         throw:{error, Reason, Stack} ->
             throw({error, Reason, [{TaskID, InitialCtx} | Stack]})
-    end;
-
-execute(A, B) ->
-    lager:info("undef: ~p ~p", [A, B]).
+    end.
 
 
 
@@ -152,7 +95,7 @@ receive_response(StreamRef) ->
     receive
         {gun_response, ConnPid, StreamRef, fin, Status, Headers} ->
             gun:close(ConnPid),
-            #{status => Status, headers => convert_headers(Headers), body => undefined};
+            #{status => Status, headers => convert_headers(Headers), body => ""};
         {gun_response, ConnPid, StreamRef, nofin, Status, Headers} ->
             receive_data(ConnPid, Status, Headers, StreamRef, []);
         {'DOWN', _MRef, process, _ConnPid, Reason} ->
@@ -167,7 +110,7 @@ receive_data(ConnPid, Status, Headers, StreamRef, Res) ->
         {gun_data, ConnPid, StreamRef, nofin, Data} ->
             receive_data(ConnPid, Status, Headers, StreamRef, [Data | Res]);
         {gun_data, ConnPid, StreamRef, fin, Data} ->
-            Body = lists:reverse([Data | Res]),
+            Body = lists:flatten([binary_to_list(B) || B <- lists:reverse([Data | Res])]),
             gun:close(ConnPid),
             #{status => Status, headers => convert_headers(Headers), body => Body};
         {'DOWN', _MRef, process, ConnPid, Reason} ->
@@ -187,10 +130,11 @@ convert_headers(Headers) ->
 
 
 
-validate(#{status := Status, headers := Headers, body := _Body}, #{id := _TID} = T, Context) ->
+validate(#{status := Status, headers := Headers, body := Body}, #{id := _TID} = T, Context) ->
     ContextAfterStatusValidation = validate_status(Status, T, Context),
     ContextAfterHeadersValidation = validate_headers(Headers, T, ContextAfterStatusValidation),
-    ContextAfterHeadersValidation.
+    ContextAfterBodyValidation = validate_body(Body, T, ContextAfterHeadersValidation),
+    ContextAfterBodyValidation.
 
 validate_status(Status, #{id := TID, data := #{statusConstraints := SC}}, Ctx) ->
     case lists:member(Status, SC) of
@@ -207,6 +151,17 @@ validate_headers([H | Headers], #{id := TID, data := #{headersConstraints := HC}
     Ctx2 = match_header(H, ML, Ctx, TID),
     ok = validate_matched_values(Ctx2, HC, TID),
     validate_headers(Headers, T, merge_contexts(Ctx2, Ctx, TID)).
+
+validate_body(_Body, #{data := #{bodyConstraints := #{matchBody := ""}}}, Ctx) ->
+    Ctx;
+validate_body(Body, #{id := TID, data := #{bodyConstraints := #{matchBody := BodyTemplate}}}, Ctx) ->
+    case template:match(BodyTemplate, Body) of
+        {error, Reason} ->
+            throw({error, Reason, [{TID, []}]});
+
+        Ctx2 ->
+            merge_contexts(Ctx2, Ctx, TID)
+    end.
 
 
 validate_matched_values(MatchResult, HC, TID) when is_map(MatchResult) ->
