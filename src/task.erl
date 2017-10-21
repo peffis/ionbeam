@@ -5,32 +5,25 @@
 
 
 create(Data) when is_map(Data) ->
-    Task = #{subtasks => [], data => Data},
-    TID = task_handler:add(Task),
-    Task#{id => TID}.
+    #{subtasks => [], data => Data}.
 
 create(Data, Subtasks) when is_list(Subtasks) ->
     Parent = create(Data),
-    #{id := Pid} = Parent,
-    NewParent = Parent#{subtasks => Subtasks},
-    task_handler:update(Pid, NewParent),
-    NewParent.
+    Parent#{subtasks => Subtasks}.
 
 
+add_subtask(Child, #{subtasks := Subs} = Parent) ->
+    Parent#{subtasks => Subs ++ [Child]}.
 
-add_subtask(Child, #{id := PID, subtasks := Subs} = Parent) ->
-    NewParent = Parent#{subtasks => Subs ++ [Child]},
-    task_handler:update(PID, NewParent),
-    NewParent.
 
-show_result(#{data := #{description := D}, id := TID, subtasks := ST}, ResultCtx) ->
+show_result(#{data := #{description := D}, subtasks := ST}, ResultCtx) ->
     Indentation = case ST of
                       [] ->
                           "   ";
                       _ -> ""
                   end,
 
-    lager:info("~scompleted \"~s\" (~s...)", [Indentation, D, lists:sublist(binary_to_list(TID), 12)]),
+    lager:info("~scompleted \"~s\"", [Indentation, D]),
     show_result(Indentation, maps:to_list(ResultCtx));
 
 show_result(Indentation, TupleList) when is_list(Indentation), is_list(TupleList) ->
@@ -47,8 +40,8 @@ show_result(Indentation, TupleList) when is_list(Indentation), is_list(TupleList
 
 
 %% execute runs a task given a context, if successful it returns the new context or throws an {error, Reason, Stack} tuple
-execute(#{subtasks := [], id := TaskID, data := #{description := Desc}} = T, Context) ->
-    lager:info("   running \"~s\" (~s...)", [Desc, lists:sublist(binary_to_list(TaskID), 12)]),
+execute(#{subtasks := [], data := #{description := Desc}} = T, Context) ->
+    lager:info("   running \"~s\"", [Desc]),
 
     try
         Response = execute_task(T, Context),
@@ -57,22 +50,22 @@ execute(#{subtasks := [], id := TaskID, data := #{description := Desc}} = T, Con
     catch
         error:Reason ->
             lager:error("stack: ~p", [erlang:get_stacktrace()]),
-            throw({error, Reason, [{TaskID, Context}]});
+            throw({error, Reason, [{Desc, Context}]});
 
         throw:{error, Reason, Stack} ->
-            throw({error, Reason, [{TaskID, Context} | Stack]})
+            throw({error, Reason, [{Desc, Context} | Stack]})
     end;
 
 
-execute(#{subtasks := Subtasks, id := TaskID, data := #{description := Desc}}, InitialCtx) ->
-    lager:info("running \"~s\" (~s...)", [Desc, lists:sublist(binary_to_list(TaskID), 12)]),
+execute(#{subtasks := Subtasks, data := #{description := Desc}}, InitialCtx) ->
+    lager:info("running \"~s\"", [Desc]),
 
     try
         lists:foldl(fun(T, Ctx) -> execute(T, Ctx) end, InitialCtx, Subtasks)
 
     catch
         throw:{error, Reason, Stack} ->
-            throw({error, Reason, [{TaskID, InitialCtx} | Stack]})
+            throw({error, Reason, [{Desc, InitialCtx} | Stack]})
     end.
 
 
@@ -166,79 +159,83 @@ convert_headers(Headers) ->
 
 
 
-validate(#{status := Status, headers := Headers, body := Body}, #{id := _TID} = T, Context) ->
+validate(#{status := Status, headers := Headers, body := Body}, T, Context) ->
     ContextAfterStatusValidation = validate_status(Status, T, Context),
     ContextAfterHeadersValidation = validate_headers(Headers, T, ContextAfterStatusValidation),
     ContextAfterBodyValidation = validate_body(Body, T, ContextAfterHeadersValidation),
     ContextAfterBodyValidation.
 
-validate_status(Status, #{id := TID, data := Data}, Ctx) ->
+validate_status(Status, #{data := Data}, Ctx) ->
     SC = maps:get(statusConstraints, Data, [200]),
     case lists:member(Status, SC) of
         true ->
             Ctx;
         _ ->
-            throw({error, {status, {Status, SC}}, [{TID, Ctx}]})
+            Descr = maps:get(description, Data),
+            throw({error, {status, {Status, SC}}, [{Descr, Ctx}]})
     end.
 
 validate_headers([], _, Ctx) ->
     Ctx;
-validate_headers([H | Headers], #{id := TID, data := Data} = T, Ctx) ->
+validate_headers([H | Headers], #{data := Data} = T, Ctx) ->
     HC = maps:get(headersConstraints, Data, #{matchLines => []}),
     #{matchLines := ML} = HC,
-    Ctx2 = match_header(H, ML, Ctx, TID),
-    ok = validate_matched_values(Ctx2, HC, TID),
-    validate_headers(Headers, T, merge_contexts(Ctx2, Ctx, TID)).
+    Descr = maps:get(description, Data),
+    Ctx2 = match_header(H, ML, Ctx, Descr),
+    ok = validate_matched_values(Ctx2, HC, Descr),
+    validate_headers(Headers, T, merge_contexts(Ctx2, Ctx, Descr)).
 
 
-validate_body(Body, #{id := TID, data := Data}, Ctx) ->
+validate_body(Body, #{data := Data}, Ctx) ->
     case maps:get(bodyConstraints, Data, ignore_body) of
         ignore_body -> Ctx;
 
         #{matchBody := BodyTemplate} ->
+            Descr = maps:get(description, Data),
+
             case template:match(BodyTemplate, Body) of
                 {error, Reason} ->
-                    throw({error, Reason, [{TID, []}]});
+                    throw({error, Reason, [{Descr, []}]});
 
                 Ctx2 ->
-                    merge_contexts(Ctx2, Ctx, TID)
+                    merge_contexts(Ctx2, Ctx, Descr)
             end;
 
         _ -> Ctx
     end.
 
 
-validate_matched_values(MatchResult, HC, TID) when is_map(MatchResult) ->
-    validate_matched_values(maps:to_list(MatchResult), HC, TID);
+validate_matched_values(MatchResult, HC, Descr) when is_map(MatchResult) ->
+    validate_matched_values(maps:to_list(MatchResult), HC, Descr);
 validate_matched_values([], _HC, _) ->
     ok;
-validate_matched_values([{Key, Val} | Rest], HC, TID) ->
+validate_matched_values([{Key, Val} | Rest], HC, Descr) ->
     case maps:get(Key, HC, undefined) of
         Val ->
-            validate_matched_values(Rest, HC, TID);
+            validate_matched_values(Rest, HC, Descr);
 
         undefined ->
-            validate_matched_values(Rest, HC, TID);
+            validate_matched_values(Rest, HC, Descr);
 
         OtherVal ->
-            throw({error, {mismatch, Val, OtherVal}, [{TID, []}]})
+            throw({error, {mismatch, Val, OtherVal}, [{Descr, []}]})
     end.
 
 
 
 
-match_header(_, [], Ctx, _TID) ->
+match_header(_, [], Ctx, _Descr) ->
     Ctx;
-match_header(H, [HTempl | Rest], Ctx, TID) ->
+match_header(H, [HTempl | Rest], Ctx, Descr) ->
     case template:match(HTempl, H) of
         {error, _} ->
-            match_header(H, Rest, Ctx, TID);
+            match_header(H, Rest, Ctx, Descr);
         Ctx2 ->
-            merge_contexts(Ctx2, Ctx, TID)
+            merge_contexts(Ctx2, Ctx, Descr)
     end.
 
 
-merge_contexts(Addition, Current, TID) ->
+merge_contexts(Addition, Current, Descr) ->
     lists:foldl(fun({Key, Val}, Ctx) ->
                         [First | _] = Key, %% extract the first char
                         case First of
@@ -250,7 +247,7 @@ merge_contexts(Addition, Current, TID) ->
                                     Val ->
                                         Ctx;
                                     OtherVal ->
-                                        throw({error, {value_mismatch, Val, OtherVal}, [{TID, Ctx}]})
+                                        throw({error, {value_mismatch, Val, OtherVal}, [{Descr, Ctx}]})
                                 end
                         end
                 end, Current, maps:to_list(Addition)).
