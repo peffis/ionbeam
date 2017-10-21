@@ -50,10 +50,7 @@ execute(#{subtasks := [], data := #{description := Desc}} = T, Context) ->
     catch
         error:Reason ->
             lager:error("stack: ~p", [erlang:get_stacktrace()]),
-            throw({error, Reason, [{Desc, Context}]});
-
-        throw:{error, Reason, Stack} ->
-            throw({error, Reason, [{Desc, Context} | Stack]})
+            throw({error, Reason, [{Desc, Context}]})
     end;
 
 
@@ -85,13 +82,13 @@ execute_task(#{data := Data}, C) ->
     Body = template:replace(BodyTemplate, C),
     Method = template:replace(MethodTemplate, C),
 
-    do_request(Method, Host, Port, Path, Headers, Body).
+    do_request(Method, Host, Port, Path, Headers, Body, C).
 
 
 
 
 
-do_request(Method, Host, Port, Path, Headers, Body) ->
+do_request(Method, Host, Port, Path, Headers, Body, C) ->
     Scheme = case Port of
                  80 -> "http";
                  _ -> "https"
@@ -99,20 +96,20 @@ do_request(Method, Host, Port, Path, Headers, Body) ->
     lager:info("     request: ~s ~s://~s:~p~s", [Method, Scheme, Host, Port, Path]),
     {ok, ConnPid} = gun:open(Host, Port),
     ParsedHeaders = parse_headers(Headers),
-    StreamRef = make_request(Method, ConnPid, Path, ParsedHeaders, Body),
+    StreamRef = make_request(Method, ConnPid, Path, ParsedHeaders, Body, C),
     receive_response(StreamRef).
 
-make_request("GET", ConnPid, Path, Headers, _Body) ->
+make_request("GET", ConnPid, Path, Headers, _Body, _C) ->
     gun:get(ConnPid, Path, Headers);
-make_request("POST", ConnPid, Path, Headers, Body) ->
+make_request("POST", ConnPid, Path, Headers, Body, _C) ->
     gun:post(ConnPid, Path, Headers, Body);
-make_request("PUT", ConnPid, Path, Headers, Body) ->
+make_request("PUT", ConnPid, Path, Headers, Body, _C) ->
     gun:post(ConnPid, Path, Headers, Body);
-make_request("DELETE", ConnPid, Path, Headers, _) ->
+make_request("DELETE", ConnPid, Path, Headers, _Body, _C) ->
     gun:delete(ConnPid, Path, Headers);
-make_request(Method, ConnPid, _, _, _) ->
+make_request(Method, ConnPid, _, _, _, C) ->
     gun:close(ConnPid),
-    throw({error, {http_method_not_implemented, Method}, []}).
+    throw({error, {http_method_not_implemented, Method}, C}).
 
 
 
@@ -182,7 +179,7 @@ validate_headers([H | Headers], #{data := Data} = T, Ctx) ->
     #{matchLines := ML} = HC,
     Descr = maps:get(description, Data),
     Ctx2 = match_header(H, ML, Ctx, Descr),
-    ok = validate_matched_values(Ctx2, HC, Descr),
+    ok = validate_matched_values(Ctx2, HC, Descr, Ctx2),
     validate_headers(Headers, T, merge_contexts(Ctx2, Ctx, Descr)).
 
 
@@ -195,7 +192,7 @@ validate_body(Body, #{data := Data}, Ctx) ->
 
             case template:match(BodyTemplate, Body) of
                 {error, Reason} ->
-                    throw({error, Reason, [{Descr, []}]});
+                    throw({error, Reason, [{Descr, Ctx}]});
 
                 Ctx2 ->
                     merge_contexts(Ctx2, Ctx, Descr)
@@ -205,20 +202,20 @@ validate_body(Body, #{data := Data}, Ctx) ->
     end.
 
 
-validate_matched_values(MatchResult, HC, Descr) when is_map(MatchResult) ->
-    validate_matched_values(maps:to_list(MatchResult), HC, Descr);
-validate_matched_values([], _HC, _) ->
+validate_matched_values(MatchResult, HC, Descr, Ctx) when is_map(MatchResult) ->
+    validate_matched_values(maps:to_list(MatchResult), HC, Descr, Ctx);
+validate_matched_values([], _HC, _, _) ->
     ok;
-validate_matched_values([{Key, Val} | Rest], HC, Descr) ->
+validate_matched_values([{Key, Val} | Rest], HC, Descr, Ctx) ->
     case maps:get(Key, HC, undefined) of
         Val ->
-            validate_matched_values(Rest, HC, Descr);
+            validate_matched_values(Rest, HC, Descr, Ctx);
 
         undefined ->
-            validate_matched_values(Rest, HC, Descr);
+            validate_matched_values(Rest, HC, Descr, Ctx);
 
         OtherVal ->
-            throw({error, {mismatch, Val, OtherVal}, [{Descr, []}]})
+            throw({error, {mismatch, Val, OtherVal}, [{Descr, Ctx}]})
     end.
 
 
