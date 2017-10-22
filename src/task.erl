@@ -175,7 +175,7 @@ validate_body(Body, T, Ctx) ->
     case maps:get(bodyConstraints, T, ignore_body) of
         ignore_body -> Ctx;
 
-        #{matchBody := BodyTemplate} ->
+        #{matchBody := BodyTemplate} = BC ->
             Descr = maps:get(description, T, "task not described"),
 
             case template:match(BodyTemplate, Body) of
@@ -183,6 +183,7 @@ validate_body(Body, T, Ctx) ->
                     throw({error, Reason, [{Descr, Ctx}]});
 
                 Ctx2 ->
+                    ok = validate_matched_values(Ctx2, BC, Descr, Ctx2),
                     merge_contexts(Ctx2, Ctx, Descr)
             end;
 
