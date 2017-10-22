@@ -1,4 +1,5 @@
 src/tester.erl
+src/tester2.erl
 deps
 *~
 ebin

@@ -10,7 +10,7 @@
 		  gun
                  ]},
   {mod, { ionbeam_app, []}},
-  {included_applications, [template]},
+  {included_applications, [template, jiffy]},
   {modules, []},
   {env, []}
  ]}.
