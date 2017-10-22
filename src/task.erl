@@ -1,22 +1,16 @@
 -module(task).
 
 -compile([{parse_transform, lager_transform}]).
--export([create/1, create/2, add_subtask/2, execute/2, show_result/2]).
-
-
-create(Data) when is_map(Data) ->
-    #{subtasks => [], data => Data}.
-
-create(Data, Subtasks) when is_list(Subtasks) ->
-    Parent = create(Data),
-    Parent#{subtasks => Subtasks}.
+-export([add_subtask/2, execute/2, show_result/2]).
 
 
 add_subtask(Child, #{subtasks := Subs} = Parent) ->
     Parent#{subtasks => Subs ++ [Child]}.
 
 
-show_result(#{data := #{description := D}, subtasks := ST}, ResultCtx) ->
+show_result(T, ResultCtx) when is_map(T), is_map(ResultCtx) ->
+    D = maps:get(description, T, "task not described"),
+    ST = maps:get(subtasks, T, []),
     Indentation = case ST of
                       [] ->
                           "   ";
@@ -40,40 +34,35 @@ show_result(Indentation, TupleList) when is_list(Indentation), is_list(TupleList
 
 
 %% execute runs a task given a context, if successful it returns the new context or throws an {error, Reason, Stack} tuple
-execute(#{subtasks := [], data := #{description := Desc}} = T, Context) ->
+execute(T, Context) ->
+    Desc = maps:get(description, T, "task not described"),
+    Subtasks = maps:get(subtasks, T, []),
     lager:info("   running \"~s\"", [Desc]),
 
     try
-        Response = execute_task(T, Context),
-        validate(Response, T, Context)
+        case Subtasks of
+            [] ->
+                Response = execute_task(T, Context),
+                validate(Response, T, Context);
+
+            _ when is_list(Subtasks)  ->
+                lists:foldl(fun(ST, Ctx) -> execute(ST, Ctx) end, Context, Subtasks)
+        end
 
     catch
         error:Reason ->
             lager:error("stack: ~p", [erlang:get_stacktrace()]),
             throw({error, Reason, [{Desc, Context}]})
-    end;
-
-
-execute(#{subtasks := Subtasks, data := #{description := Desc}}, InitialCtx) ->
-    lager:info("running \"~s\"", [Desc]),
-
-    try
-        lists:foldl(fun(T, Ctx) -> execute(T, Ctx) end, InitialCtx, Subtasks)
-
-    catch
-        throw:{error, Reason, Stack} ->
-            throw({error, Reason, [{Desc, InitialCtx} | Stack]})
     end.
 
 
-
-execute_task(#{data := Data}, C) ->
-    MethodTemplate = maps:get(methodTemplate, Data, "GET"),
-    HostTemplate = maps:get(hostTemplate, Data, "localhost"),
-    PortTemplate = maps:get(portTemplate, Data, "80"),
-    PathTemplate = maps:get(pathTemplate, Data, "/"),
-    HeadersTemplate = maps:get(headersTemplate, Data, "\r\n"),
-    BodyTemplate = maps:get(bodyTemplate, Data, ""),
+execute_task(T, C) ->
+    MethodTemplate = maps:get(methodTemplate, T, "GET"),
+    HostTemplate = maps:get(hostTemplate, T, "localhost"),
+    PortTemplate = maps:get(portTemplate, T, "80"),
+    PathTemplate = maps:get(pathTemplate, T, "/"),
+    HeadersTemplate = maps:get(headersTemplate, T, "\r\n"),
+    BodyTemplate = maps:get(bodyTemplate, T, ""),
 
     Host = template:replace(HostTemplate, C),
     Port = list_to_integer(template:replace(PortTemplate, C)),
@@ -110,10 +99,6 @@ make_request("DELETE", ConnPid, Path, Headers, _Body, _C) ->
 make_request(Method, ConnPid, _, _, _, C) ->
     gun:close(ConnPid),
     throw({error, {http_method_not_implemented, Method}, C}).
-
-
-
-
 
 
 
@@ -162,33 +147,33 @@ validate(#{status := Status, headers := Headers, body := Body}, T, Context) ->
     ContextAfterBodyValidation = validate_body(Body, T, ContextAfterHeadersValidation),
     ContextAfterBodyValidation.
 
-validate_status(Status, #{data := Data}, Ctx) ->
-    SC = maps:get(statusConstraints, Data, [200]),
+validate_status(Status, T, Ctx) ->
+    SC = maps:get(statusConstraints, T, [200]),
     case lists:member(Status, SC) of
         true ->
             Ctx;
         _ ->
-            Descr = maps:get(description, Data),
+            Descr = maps:get(description, T, "task not described"),
             throw({error, {status, {Status, SC}}, [{Descr, Ctx}]})
     end.
 
 validate_headers([], _, Ctx) ->
     Ctx;
-validate_headers([H | Headers], #{data := Data} = T, Ctx) ->
-    HC = maps:get(headersConstraints, Data, #{matchLines => []}),
+validate_headers([H | Headers], T, Ctx) ->
+    HC = maps:get(headersConstraints, T, #{matchLines => []}),
     #{matchLines := ML} = HC,
-    Descr = maps:get(description, Data),
+    Descr = maps:get(description, T, "task not described"),
     Ctx2 = match_header(H, ML, Ctx, Descr),
     ok = validate_matched_values(Ctx2, HC, Descr, Ctx2),
     validate_headers(Headers, T, merge_contexts(Ctx2, Ctx, Descr)).
 
 
-validate_body(Body, #{data := Data}, Ctx) ->
-    case maps:get(bodyConstraints, Data, ignore_body) of
+validate_body(Body, T, Ctx) ->
+    case maps:get(bodyConstraints, T, ignore_body) of
         ignore_body -> Ctx;
 
         #{matchBody := BodyTemplate} ->
-            Descr = maps:get(description, Data),
+            Descr = maps:get(description, T, "task not described"),
 
             case template:match(BodyTemplate, Body) of
                 {error, Reason} ->
