@@ -1,7 +1,7 @@
 -module(task).
 
 -compile([{parse_transform, lager_transform}]).
--export([add_subtask/2, execute/2, show_result/2]).
+-export([add_subtask/2, execute/1, execute/2, show_result/2]).
 
 
 add_subtask(Child, #{subtasks := Subs} = Parent) ->
@@ -34,6 +34,9 @@ show_result(Indentation, TupleList) when is_list(Indentation), is_list(TupleList
 
 
 %% execute runs a task given a context, if successful it returns the new context or throws an {error, Reason, Stack} tuple
+execute(T) ->
+    execute(T, #{}).
+
 execute(T, Context) ->
     Desc = maps:get(description, T, "task not described"),
     Subtasks = maps:get(subtasks, T, []),
@@ -59,7 +62,7 @@ execute(T, Context) ->
 execute_task(T, C) ->
     MethodTemplate = maps:get(methodTemplate, T, "GET"),
     HostTemplate = maps:get(hostTemplate, T, "localhost"),
-    PortTemplate = maps:get(portTemplate, T, "80"),
+    PortTemplate = maps:get(portTemplate, T, "443"),
     PathTemplate = maps:get(pathTemplate, T, "/"),
     HeadersTemplate = maps:get(headersTemplate, T, "\r\n"),
     BodyTemplate = maps:get(bodyTemplate, T, ""),
@@ -160,8 +163,8 @@ validate_status(Status, T, Ctx) ->
 validate_headers([], _, Ctx) ->
     Ctx;
 validate_headers([H | Headers], T, Ctx) ->
-    HC = maps:get(headersConstraints, T, #{matchLines => []}),
-    #{matchLines := ML} = HC,
+    HC = maps:get(headersConstraints, T, #{matchHeaders => []}),
+    #{matchHeaders := ML} = HC,
     Descr = maps:get(description, T, "task not described"),
     Ctx2 = match_header(H, ML, Ctx, Descr),
     ok = validate_matched_values(Ctx2, HC, Descr, Ctx2),
