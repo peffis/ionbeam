@@ -96,7 +96,7 @@ make_request("GET", ConnPid, Path, Headers, _Body, _C) ->
 make_request("POST", ConnPid, Path, Headers, Body, _C) ->
     gun:post(ConnPid, Path, Headers, Body);
 make_request("PUT", ConnPid, Path, Headers, Body, _C) ->
-    gun:post(ConnPid, Path, Headers, Body);
+    gun:put(ConnPid, Path, Headers, Body);
 make_request("DELETE", ConnPid, Path, Headers, _Body, _C) ->
     gun:delete(ConnPid, Path, Headers);
 make_request(Method, ConnPid, _, _, _, C) ->
