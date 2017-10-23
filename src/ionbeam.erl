@@ -31,7 +31,7 @@ run_script([{T, InCtxFun, OutCtxKey} | Rest], Contexts) when is_function(InCtxFu
 
 
 execute_task(T, InCtx, OutCtxKey, Contexts) ->
-    Ctx = task:execute(T, InCtx),
+    Ctx = ionbeam_task:execute(ionbeam_task:create(T), InCtx),
     store_ctx(OutCtxKey, Ctx, Contexts).
 
 

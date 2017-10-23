@@ -1,7 +1,29 @@
--module(task).
+-module(ionbeam_task).
 
 -compile([{parse_transform, lager_transform}]).
--export([add_subtask/2, execute/1, execute/2, show_result/2]).
+-export([create/1, add_subtask/2, execute/1, execute/2, show_result/2]).
+
+-define(DEFAULT_VALUES,
+        #{subtasks => [],
+          description => "task not described",
+          methodTemplate => "GET",
+          hostTemplate => "localhost",
+          portTemplate => "443",
+          pathTemplate => "/",
+          headersTemplate => "\r\n",
+          bodyTemplate => "",
+          statusConstraints => undefined,
+          headersConstraints => undefined,
+          bodyConstraints => undefined}).
+
+
+
+create(TaskData) ->
+    apply_defaults(TaskData).
+
+
+apply_defaults(TaskData) ->
+    maps:merge(?DEFAULT_VALUES, TaskData).
 
 
 add_subtask(Child, #{subtasks := Subs} = Parent) ->
@@ -9,8 +31,8 @@ add_subtask(Child, #{subtasks := Subs} = Parent) ->
 
 
 show_result(T, ResultCtx) when is_map(T), is_map(ResultCtx) ->
-    D = maps:get(description, T, "task not described"),
-    ST = maps:get(subtasks, T, []),
+    D = maps:get(description, T),
+    ST = maps:get(subtasks, T),
     Indentation = case ST of
                       [] ->
                           "   ";
@@ -38,8 +60,8 @@ execute(T) ->
     execute(T, #{}).
 
 execute(T, Context) ->
-    Desc = maps:get(description, T, "task not described"),
-    Subtasks = maps:get(subtasks, T, []),
+    Desc = maps:get(description, T),
+    Subtasks = maps:get(subtasks, T),
     lager:info("   running \"~s\"", [Desc]),
 
     try
@@ -150,45 +172,45 @@ validate(#{status := Status, headers := Headers, body := Body}, T, Context) ->
     ContextAfterBodyValidation = validate_body(Body, T, ContextAfterHeadersValidation),
     ContextAfterBodyValidation.
 
-validate_status(Status, T, Ctx) ->
-    SC = maps:get(statusConstraints, T, [200]),
+validate_status(_, #{statusConstraints := undefined}, Ctx) ->
+    Ctx;
+validate_status(Status, #{statusConstraints := SC} = T, Ctx) ->
     case lists:member(Status, SC) of
         true ->
             Ctx;
         _ ->
-            Descr = maps:get(description, T, "task not described"),
+            Descr = maps:get(description, T),
             throw({error, {status, {Status, SC}}, [{Descr, Ctx}]})
     end.
 
+validate_headers(_, #{headersConstraints := undefined}, Ctx) ->
+    Ctx;
 validate_headers([], _, Ctx) ->
     Ctx;
-validate_headers([H | Headers], T, Ctx) ->
-    HC = maps:get(headersConstraints, T, #{matchHeaders => []}),
+validate_headers([H | Headers], #{headersConstraints := HC} = T, Ctx) ->
     #{matchHeaders := ML} = HC,
-    Descr = maps:get(description, T, "task not described"),
+    Descr = maps:get(description, T),
     Ctx2 = match_header(H, ML, Ctx, Descr),
     ok = validate_matched_values(Ctx2, HC, Descr, Ctx2),
     validate_headers(Headers, T, merge_contexts(Ctx2, Ctx, Descr)).
 
 
-validate_body(Body, T, Ctx) ->
-    case maps:get(bodyConstraints, T, ignore_body) of
-        ignore_body -> Ctx;
+validate_body(_, #{bodyConstraints := undefined}, Ctx) ->
+    Ctx;
+validate_body(Body, #{bodyConstraints := BC} = T, Ctx) ->
+    #{matchBody := BodyTemplate} = BC,
+    Descr = maps:get(description, T),
 
-        #{matchBody := BodyTemplate} = BC ->
-            Descr = maps:get(description, T, "task not described"),
+    case template:match(BodyTemplate, Body) of
+        {error, Reason} ->
+            throw({error, Reason, [{Descr, Ctx}]});
 
-            case template:match(BodyTemplate, Body) of
-                {error, Reason} ->
-                    throw({error, Reason, [{Descr, Ctx}]});
-
-                Ctx2 ->
-                    ok = validate_matched_values(Ctx2, BC, Descr, Ctx2),
-                    merge_contexts(Ctx2, Ctx, Descr)
-            end;
-
-        _ -> Ctx
+        Ctx2 ->
+            ok = validate_matched_values(Ctx2, BC, Descr, Ctx2),
+            merge_contexts(Ctx2, Ctx, Descr)
     end.
+
+
 
 
 validate_matched_values(MatchResult, HC, Descr, Ctx) when is_map(MatchResult) ->
