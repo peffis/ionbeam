@@ -9,24 +9,26 @@ run_script(Script) ->
 run_script([], _) ->
     ok;
 
-run_script([{T, '_', OutCtxKey} | Rest], Contexts) ->
-    NextContexts = execute_task(T, #{}, OutCtxKey, Contexts),
-    run_script(Rest, NextContexts);
-
-run_script([{T, InCtxKey, OutCtxKey} | Rest], Contexts) when is_atom(InCtxKey) ->
-    case maps:get(InCtxKey, Contexts, undefined) of
-        undefined ->
-            {error, {ctx_not_found, InCtxKey}};
-
-        InCtx ->
-            NextContexts = execute_task(T, InCtx, OutCtxKey, Contexts),
-            run_script(Rest, NextContexts)
-    end;
-
-run_script([{T, InCtxFun, OutCtxKey} | Rest], Contexts) when is_function(InCtxFun) ->
-    InCtx = InCtxFun(Contexts),
+run_script([{T, InContextKey, OutCtxKey} | Rest], Contexts) ->
+    InCtx = make_ctx(InContextKey, Contexts),
     NextContexts = execute_task(T, InCtx, OutCtxKey, Contexts),
     run_script(Rest, NextContexts).
+
+
+make_ctx('_', _Contexts) ->
+    #{};
+
+make_ctx(Key, Contexts) when is_atom(Key) ->
+    case maps:get(Key, Contexts, undefined) of
+        undefined ->
+            {error, {ctx_not_found, Key}};
+
+        Ctx ->
+            Ctx
+    end;
+
+make_ctx(KeyFun, Contexts) when is_function(KeyFun) ->
+    KeyFun(Contexts).
 
 
 
