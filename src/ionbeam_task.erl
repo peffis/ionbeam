@@ -194,9 +194,8 @@ validate_headers([H | Headers], #{headersConstraints := HC} = T, Ctx) ->
 
 validate_body(_, #{bodyConstraints := undefined}, Ctx) ->
     Ctx;
-validate_body(Body, #{bodyConstraints := BC} = T, Ctx) ->
+validate_body(Body, #{bodyConstraints := BC, description := Descr} = T, Ctx) ->
     #{matchBody := BodyTemplate} = BC,
-    Descr = maps:get(description, T),
 
     case template:match(BodyTemplate, Body) of
         {error, Reason} ->
@@ -244,7 +243,7 @@ merge_contexts(Addition, Current, Descr) ->
     lists:foldl(fun({Key, Val}, Ctx) ->
                         [First | _] = Key, %% extract the first char
                         case First of
-                            $_ -> Ctx#{Key => Val};
+                            $_ -> Ctx#{Key => Val}; %% let variables starting with _ override existing variables of same name
                             _ ->
                                 case maps:get(Key, Ctx, undefined) of
                                     undefined ->
