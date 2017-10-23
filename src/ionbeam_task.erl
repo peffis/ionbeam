@@ -82,12 +82,12 @@ execute(T, Context) ->
 
 
 execute_task(T, C) ->
-    MethodTemplate = maps:get(methodTemplate, T, "GET"),
-    HostTemplate = maps:get(hostTemplate, T, "localhost"),
-    PortTemplate = maps:get(portTemplate, T, "443"),
-    PathTemplate = maps:get(pathTemplate, T, "/"),
-    HeadersTemplate = maps:get(headersTemplate, T, "\r\n"),
-    BodyTemplate = maps:get(bodyTemplate, T, ""),
+    MethodTemplate = maps:get(methodTemplate, T),
+    HostTemplate = maps:get(hostTemplate, T),
+    PortTemplate = maps:get(portTemplate, T),
+    PathTemplate = maps:get(pathTemplate, T),
+    HeadersTemplate = maps:get(headersTemplate, T),
+    BodyTemplate = maps:get(bodyTemplate, T),
 
     Host = template:replace(HostTemplate, C),
     Port = list_to_integer(template:replace(PortTemplate, C)),
