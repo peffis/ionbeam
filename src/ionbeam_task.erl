@@ -194,7 +194,17 @@ validate_headers([H | Headers], #{headersConstraints := HC} = T, Ctx) ->
 
 validate_body(_, #{bodyConstraints := undefined}, Ctx) ->
     Ctx;
-validate_body(Body, #{bodyConstraints := BC, description := Descr}, Ctx) ->
+
+validate_body(Body, #{bodyConstraints := BC, description := Descr}, Ctx) when is_function(BC) ->
+    case BC(Body, Ctx) of
+        {error, Reason} ->
+            throw({error, Reason, [{Descr, Ctx}]});
+
+        Ctx2 ->
+            merge_contexts(Ctx2, Ctx, Descr)
+    end;
+
+validate_body(Body, #{bodyConstraints := BC, description := Descr}, Ctx) when is_map(BC) ->
     #{matchBody := BodyTemplate} = BC,
 
     case template:match(BodyTemplate, Body) of
