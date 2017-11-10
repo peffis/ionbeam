@@ -194,7 +194,7 @@ validate_headers([H | Headers], #{headersConstraints := HC} = T, Ctx) ->
 
 validate_body(_, #{bodyConstraints := undefined}, Ctx) ->
     Ctx;
-validate_body(Body, #{bodyConstraints := BC, description := Descr} = T, Ctx) ->
+validate_body(Body, #{bodyConstraints := BC, description := Descr}, Ctx) ->
     #{matchBody := BodyTemplate} = BC,
 
     case template:match(BodyTemplate, Body) of
