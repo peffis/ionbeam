@@ -6,12 +6,12 @@
 -define(DEFAULT_VALUES,
         #{subtasks => [],
           description => "task not described",
-          methodTemplate => "GET",
-          hostTemplate => "localhost",
-          portTemplate => "443",
-          pathTemplate => "/",
-          headersTemplate => "\r\n",
-          bodyTemplate => "",
+          method => "GET",
+          host => "localhost",
+          port => "443",
+          path => "/",
+          headers => "\r\n",
+          body => "",
           statusConstraints => undefined,
           headersConstraints => undefined,
           bodyConstraints => undefined}).
@@ -82,12 +82,12 @@ execute(T, Context) ->
 
 
 execute_task(T, C) ->
-    MethodTemplate = maps:get(methodTemplate, T),
-    HostTemplate = maps:get(hostTemplate, T),
-    PortTemplate = maps:get(portTemplate, T),
-    PathTemplate = maps:get(pathTemplate, T),
-    HeadersTemplate = maps:get(headersTemplate, T),
-    BodyTemplate = maps:get(bodyTemplate, T),
+    MethodTemplate = maps:get(method, T),
+    HostTemplate = maps:get(host, T),
+    PortTemplate = maps:get(port, T),
+    PathTemplate = maps:get(path, T),
+    HeadersTemplate = maps:get(headers, T),
+    BodyTemplate = maps:get(body, T),
 
     Host = template:replace(HostTemplate, C),
     Port = list_to_integer(template:replace(PortTemplate, C)),
