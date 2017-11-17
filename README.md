@@ -169,12 +169,13 @@ well:
      }
 ```
 
-As you can see, this pretended HTTP API would like an authentication
-header X-Token with a token value, which happens to be the value
-returned from the login request above so we give the output context from the LoginTask task as input context to the ListItemsTask task.
-We don't do much validation
-for this task except for the status code which, since we did not say anything,
-must be 200 and the Content-Type value must be "application/json".
+As you can see, this pretended HTTP API needs an authentication
+header <i>X-Token</i> with a token value, which is the value
+returned from the login request above. We therefore give the output
+context from the LoginTask task as input context to the ListItemsTask
+task. We don't do much validation for this task except for the status
+code which, since we did not say anything, must be 200 and the
+Content-Type value must be "application/json".
 
 The automatic matching of variables is done using the [template
 library](https://github.com/peffis/template) which is fine, generic
