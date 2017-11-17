@@ -129,12 +129,12 @@ their input and output contexts. Example:
 
 ```erlang
 ionbeam:run_script([
-                            %% do login
-                            {LoginTask, #{"USER_NAME" => "alice",
-                                          "PASSWORD" => "secret"}, 'LoginCtx'},
+                        %% do login
+                        {LoginTask, #{"USER_NAME" => "alice",
+                                      "PASSWORD" => "secret"}, 'LoginCtx'},
 
-                            %% do list items
-                            {ListItemsTask, 'LoginCtx', 'ListItemsCtx'}
+                        %% do list items
+                        {ListItemsTask, 'LoginCtx', 'ListItemsCtx'}
                   ])
 ```
 
