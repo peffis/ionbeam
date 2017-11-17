@@ -140,12 +140,12 @@ ionbeam:run_script([
 
 The contexts are referred to through its name. In the above
 example, the output context of the LoginTask task is named 'LoginCtx'
-which is fed in as an input context to ListItemsTask. For the input
-task you have the option to either specify it as a map, the atom '_'
+which is fed in as an input context to ListItemsTask. The input
+context can be specified either as a map, the atom '_'
 (which means 'the empty context'), the name (as an Erlang atom) of an
-existing context or to specify it as a function that takes a map as
-argument, a map containing
-all previously created contexts. The latter can be used if you would like to programmatically
+existing context or you could specify it as a function that takes a map as
+argument - a map containing
+all previously created contexts. The latter option may be used if you would like to programmatically
 merge many different contexts together into one, or create a
 context from other sources.
 
