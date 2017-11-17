@@ -134,7 +134,7 @@ ionbeam:run_script([
                                           "PASSWORD" => "secret"}, 'LoginCtx'},
 
                             %% do list items
-                            {ListItemsTask, 'LoginCtx', 'ItemListCtx'}
+                            {ListItemsTask, 'LoginCtx', 'ListItemsCtx'}
                   ])
 ```
 
