@@ -131,7 +131,7 @@ their input and output contexts. Example:
 ionbeam:run_script([
                             %% do login
                             {LoginTask, #{"USER_NAME" => "alice",
-                            "PASSWORD" => "secret_password"}, 'LoginCtx'},
+                                          "PASSWORD" => "secret"}, 'LoginCtx'},
 
                             %% do list items
                             {ListItemsTask, 'LoginCtx', 'ItemListCtx'}
