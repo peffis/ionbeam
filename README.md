@@ -99,10 +99,10 @@ you run this task or else  the task will fail.
 There can be variables also in the constraints fields of a task (in the
 example above there is a TOKEN variable present in the bodyConstraints
 field and a _CONTENT_TYPE variable in the headersConstraints field). These variables
-will be matched against the response of the server and bound to
+will be matched against the actual response from the server and bound to
 values stored in the _output context_. Running the login task above
 will extract the TOKEN value out of the response body, the content
-type out of the respons headers and put both these values in the
+type out of the response headers and put both these values in the
 output context (iff the response matches the supplied constraints that
 is).
 
