@@ -96,13 +96,13 @@ that define the task (description, method, host, headers, path and
 body) must all be present and have a value in the _input context_ when
 you run this task or else  the task will fail.
 
-There can be values also in the constraints fields of a task (in the
+There can be variables also in the constraints fields of a task (in the
 example above there is a TOKEN variable present in the bodyConstraints
-field and a _CONTENT_TYPE variable in the headersConstraints. These
-will be matched against the response of the server and be given
-values stored in the _output context_. So running the login task above
+field and a _CONTENT_TYPE variable in the headersConstraints field). These variables
+will be matched against the response of the server and bound to
+values stored in the _output context_. Running the login task above
 will extract the TOKEN value out of the response body, the content
-type out of the respones headers and put both these values in the
+type out of the respons headers and put both these values in the
 output context (iff the response matches the supplied constraints that
 is).
 
