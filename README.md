@@ -61,7 +61,7 @@ A task is defined as an Erlang map that has fields such as
 description, method, host, path, body, statusConstraints,
 headersConstraints and bodyConstraints.  All these fields have default
 values (defined in
-(ionbeam_task.erl)[https://github.com/peffis/ionbeam/blob/170a24857e9762bfa4c601d17c2109ad4fb6879b/src/ionbeam_task.erl#L6-L17])
+[ionbeam_task.erl](https://github.com/peffis/ionbeam/blob/170a24857e9762bfa4c601d17c2109ad4fb6879b/src/ionbeam_task.erl#L6-L17))
 so if you are not interested in, e.g. what headers or body are returned from
 the server you can skip specifying the headersConstraints and the
 bodyConstraints and so on.
@@ -176,8 +176,8 @@ We don't do much validation
 for this task except for the status code which, since we did not say anything,
 must be 200 and the Content-Type value must be "application/json".
 
-The automatic matching of variables is done using the (template
-library)[https://github.com/peffis/template] which is fine, generic
+The automatic matching of variables is done using the [template
+library](https://github.com/peffis/template) which is fine, generic
 and all, but for very large bodies of data it might not be that
 impressive when it comes to performance. It could also be that you
 would like to programmatically parse and extract certain information
