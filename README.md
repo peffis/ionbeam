@@ -138,7 +138,7 @@ ionbeam:run_script([
                   ])
 ```
 
-The contexts are referred to through an atom name. So in the above
+The contexts are referred to through its name. In the above
 example, the output context of the LoginTask task is named 'LoginCtx'
 which is fed in as an input context to ListItemsTask. For the input
 task you have the option to either specify it as a map, the atom '_'
