@@ -143,10 +143,10 @@ example, the output context of the LoginTask task is named 'LoginCtx'
 which is fed in as an input context to ListItemsTask. For the input
 task you have the option to either specify it as a map, the atom '_'
 (which means 'the empty context'), the name (as an Erlang atom) of an
-existing context or as a function that will be given a map containing
-all previously created contexts and should return a context as a
-map. The latter can be used if you would like to programmatically
-merge many different contexts together into one, or create your
+existing context or to specify it as a function that takes a map as
+argument, a map containing
+all previously created contexts. The latter can be used if you would like to programmatically
+merge many different contexts together into one, or create a
 context from other sources.
 
 
@@ -183,7 +183,7 @@ impressive when it comes to performance. It could also be that you
 would like to programmatically parse and extract certain information
 that cannot be described using the template matcher so therefore it is
 possible to, instead of using matchBody, you set bodyConstraints to be an _erlang fun_ that
-vill validate the body instead. This function is given two arguments -
+vill validate the body instead. This function takes two arguments -
 the body and the current context - and you can then parse the body in
 whatever way you like and return a new context (or return an error
 tuple - {error, "some reason"} - if you do not think the body is
