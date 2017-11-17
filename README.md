@@ -62,9 +62,9 @@ description, method, host, path, body, statusConstraints,
 headersConstraints and bodyConstraints.  All these fields have default
 values (defined in
 [ionbeam_task.erl](https://github.com/peffis/ionbeam/blob/170a24857e9762bfa4c601d17c2109ad4fb6879b/src/ionbeam_task.erl#L6-L17))
-so if you are not interested in, e.g. what headers or body are returned from
+so if you are not interested in what headers or body are returned from
 the server you can skip specifying the headersConstraints and the
-bodyConstraints and so on.
+bodyConstraints, and so on.
 
 Example:
 
@@ -121,7 +121,7 @@ variable will not be brought over to the next task and will not cause
 that task to fail if that task comes up with a different value for the
 variable name.
 
-### Putting together tasks
+### Putting tasks together into scripts
 
 In order to run your tasks one after the other, you put together the
 tasks in a _script_ which is an Erlang list of tasks with
