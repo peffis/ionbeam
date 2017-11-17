@@ -18,6 +18,9 @@ run_script([{T, InContextKey, OutCtxKey} | Rest], Contexts) ->
 make_ctx('_', _Contexts) ->
     #{};
 
+make_ctx(Map, _Contexts) when is_map(Map) ->
+    Map;
+
 make_ctx(Key, Contexts) when is_atom(Key) ->
     case maps:get(Key, Contexts, undefined) of
         undefined ->
