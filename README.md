@@ -189,7 +189,7 @@ the body and the current context - and you can then parse the body in
 whatever way you like and return a new context (or return an error
 tuple - {error, "some reason"} - if you do not think the body is
 correct). As an example, say that the body returned is a json document
-and you which you know should have a field "members" which is a list
+that you should test to have a field "members" (as a list)
 and you want to check if "stefan" is a member of that list. The
 resulting body validation fun, if we use jiffy for json parsing, could
 then look something like like:
