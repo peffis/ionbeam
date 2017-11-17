@@ -183,7 +183,7 @@ and all, but for very large bodies of data it might not be that
 impressive when it comes to performance. It could also be that you
 would like to programmatically parse and extract certain information
 that cannot be described using the template matcher so therefore it is
-possible to, instead of using matchBody, you set bodyConstraints to be an _erlang fun_ that
+possible to, instead of using matchBody, set bodyConstraints to be an _erlang fun_ that
 vill validate the body instead. This function takes two arguments -
 the body and the current context - and you can then parse the body in
 whatever way you like and return a new context (or return an error
