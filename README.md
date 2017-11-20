@@ -59,48 +59,53 @@ responses and how to use values in the input context to form the
 request.
 
 ### Defining tasks
-A task is defined as an Erlang map that has fields such as
-description, method, host, path, body, statusConstraints,
-headersConstraints and bodyConstraints.  All these fields have default
+A task is defined as an Erlang map that has fields divided into two
+groups - those that define the request to be done and those that define
+how to validate and and extract information from the reponse. The
+request fields includes fields such as method, host, path and body and
+the response fields include status,
+headers and body.  All these fields have default
 values (defined in
 [ionbeam_task.erl](https://github.com/peffis/ionbeam/blob/170a24857e9762bfa4c601d17c2109ad4fb6879b/src/ionbeam_task.erl#L6-L17))
 so if you are not interested in what headers or body are returned from
-the server you can skip specifying the headersConstraints and the
-bodyConstraints, and so on.
+the server you can skip specifying the headers and the
+body constraints, and so on.
 
 Example:
 
 ```erlang
     LoginTask = #{
-      %% definitions
       description => "POST /api/login",
-      method => "POST",
-      host => "localhost",
-      headers => "Accept: application/json\r\nContent-Type: application/json\r\n\r\n",
-      path => "/api/login",
-      body => "{\"email\":\"$(USER_NAME)\",\"password\":\"$(PASSWORD)\"}",
 
-      %% constraints
-      statusConstraints => [200],
-      headersConstraints => #{
-        matchHeaders => ["Content-Type: $(_CONTENT_TYPE)"],
-        "_CONTENT_TYPE" => "application/json"
-       },
-      bodyConstraints => #{
-        matchBody => "$(_A)\"token\":\"$(TOKEN)\"$(_C)"
-       }
-     },
+      request => #{
+        method => "POST",
+        host => "localhost",
+        headers => "Accept: application/json\r\nContent-Type: application/json\r\n\r\n",
+        path => "/api/login",
+        body => "{\"email\":\"$(USER_NAME)\",\"password\":\"$(PASSWORD)\"}"
+      },
+
+      response => #{
+        status => [200],
+        headers => #{
+          match => ["Content-Type: $(_CONTENT_TYPE)"],
+          "_CONTENT_TYPE" => "application/json"
+        },
+        body => #{
+          match => "$(_A)\"token\":\"$(TOKEN)\"$(_C)"
+        }
+     }
 ```
 
 In the example above you can see for instance that the body field
 includes variables such as USER_NAME and PASSWORD. Variables in fields
-that define the task (description, method, host, headers, path and
+that define the request (method, host, headers, path and
 body) must all be present and have a value in the _input context_ when
 you run this task or else  the task will fail.
 
-There can be variables also in the constraints fields of a task (in the
-example above there is a TOKEN variable present in the bodyConstraints
-field and a _CONTENT_TYPE variable in the headersConstraints field). These variables
+There can be variables also in the response fields of a task (in the
+example above there is a TOKEN variable present in the body
+field and a _CONTENT_TYPE variable in the headers field). These variables
 will be matched against the actual response from the server and bound to
 values stored in the _output context_. Running the login task above
 will extract the TOKEN value out of the response body, the content
@@ -158,16 +163,21 @@ well:
 ```erlang
     ListItemsTask = #{
       description => "GET /api/items",
-      host => "localhost",
-      headers => "Accept: application/json\r\nX-Token: $(TOKEN)\r\n\r\n",
-      path => "/api/items",
-      headersConstraints => #{
-        matchHeaders => ["Content-Type: $(_CONTENT_TYPE)"],
-        "_CONTENT_TYPE" => "application/json"
-       },
-      bodyConstraints => #{
-        matchBody => "$(_BODY)"
-       }
+
+      request => #{
+        host => "localhost",
+        headers => "Accept: application/json\r\nX-Token: $(TOKEN)\r\n\r\n",
+        path => "/api/items"
+      },
+
+      response => #{
+        headers => #{
+          match => ["Content-Type: $(_CONTENT_TYPE)"],
+          "_CONTENT_TYPE" => "application/json"
+        },
+        body => #{
+          match => "$(_BODY)"
+        }
      }
 ```
 
@@ -185,7 +195,7 @@ and all, but for very large bodies of data it might not be that
 impressive when it comes to performance. It could also be that you
 would like to programmatically parse and extract certain information
 that cannot be described using the template matcher so therefore it is
-possible to, instead of using matchBody, set bodyConstraints to be an _erlang fun_ that
+possible to, instead of using match, set body to be an _erlang fun_ that
 vill validate the body instead. This function takes two arguments -
 the body and the current context - and you can then parse the body in
 whatever way you like and return a new context (or return an error
@@ -198,7 +208,7 @@ then look something like like:
 
 ```erlang
         ...
-        bodyConstraints =>
+        body =>
               fun(Body, Ctx) ->
                       #{<<"members">> := Members} = jiffy:decode(Body, [return_maps]),
                       case lists:member(<<"stefan">>, Members) of

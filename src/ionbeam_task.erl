@@ -6,15 +6,21 @@
 -define(DEFAULT_VALUES,
         #{subtasks => [],
           description => "task not described",
-          method => "GET",
-          host => "localhost",
-          port => "443",
-          path => "/",
-          headers => "\r\n",
-          body => "",
-          statusConstraints => undefined,
-          headersConstraints => undefined,
-          bodyConstraints => undefined}).
+          request => #{
+            method => "GET",
+            host => "localhost",
+            port => "443",
+            path => "/",
+            headers => "\r\n",
+            body => ""
+           },
+
+          response => #{
+            status => undefined,
+            headers => undefined,
+            body => undefined
+           }
+         }).
 
 
 
@@ -23,7 +29,11 @@ create(TaskData) ->
 
 
 apply_defaults(TaskData) ->
-    maps:merge(?DEFAULT_VALUES, TaskData).
+    Root = maps:merge(?DEFAULT_VALUES, TaskData),
+    Root#{request => maps:merge(maps:get(request, ?DEFAULT_VALUES),
+                                maps:get(request, TaskData, #{})),
+          response => maps:merge(maps:get(response, ?DEFAULT_VALUES),
+                                 maps:get(response, TaskData, #{}))}.
 
 
 add_subtask(Child, #{subtasks := Subs} = Parent) ->
@@ -81,13 +91,13 @@ execute(T, Context) ->
     end.
 
 
-execute_task(T, C) ->
-    MethodTemplate = maps:get(method, T),
-    HostTemplate = maps:get(host, T),
-    PortTemplate = maps:get(port, T),
-    PathTemplate = maps:get(path, T),
-    HeadersTemplate = maps:get(headers, T),
-    BodyTemplate = maps:get(body, T),
+execute_task(#{request := Request}, C) ->
+    MethodTemplate = maps:get(method, Request),
+    HostTemplate = maps:get(host, Request),
+    PortTemplate = maps:get(port, Request),
+    PathTemplate = maps:get(path, Request),
+    HeadersTemplate = maps:get(headers, Request),
+    BodyTemplate = maps:get(body, Request),
 
     Host = template:replace(HostTemplate, C),
     Port = list_to_integer(template:replace(PortTemplate, C)),
@@ -169,9 +179,9 @@ validate(#{status := Status, headers := Headers, body := Body}, T, Context) ->
     ContextAfterBodyValidation = validate_body(Body, T, ContextAfterHeadersValidation),
     ContextAfterBodyValidation.
 
-validate_status(_, #{statusConstraints := undefined}, Ctx) ->
+validate_status(_, #{response := #{status := undefined}}, Ctx) ->
     Ctx;
-validate_status(Status, #{statusConstraints := SC} = T, Ctx) ->
+validate_status(Status, #{response := #{status := SC}} = T, Ctx) ->
     case lists:member(Status, SC) of
         true ->
             Ctx;
@@ -180,22 +190,22 @@ validate_status(Status, #{statusConstraints := SC} = T, Ctx) ->
             throw({error, {status, {Status, SC}}, [{Descr, Ctx}]})
     end.
 
-validate_headers(_, #{headersConstraints := undefined}, Ctx) ->
+validate_headers(_, #{response := #{headers := undefined}}, Ctx) ->
     Ctx;
 validate_headers([], _, Ctx) ->
     Ctx;
-validate_headers([H | Headers], #{headersConstraints := HC} = T, Ctx) ->
-    #{matchHeaders := ML} = HC,
+validate_headers([H | Headers], #{response := #{headers := HC}} = T, Ctx) ->
+    #{match := ML} = HC,
     Descr = maps:get(description, T),
     Ctx2 = match_header(H, ML, Ctx, Descr),
     ok = validate_matched_values(Ctx2, HC, Descr, Ctx2),
     validate_headers(Headers, T, merge_contexts(Ctx2, Ctx, Descr)).
 
 
-validate_body(_, #{bodyConstraints := undefined}, Ctx) ->
+validate_body(_, #{response := #{body := undefined}}, Ctx) ->
     Ctx;
 
-validate_body(Body, #{bodyConstraints := BC, description := Descr}, Ctx) when is_function(BC) ->
+validate_body(Body, #{response := #{body := BC}, description := Descr}, Ctx) when is_function(BC) ->
     case BC(Body, Ctx) of
         {error, Reason} ->
             throw({error, Reason, [{Descr, Ctx}]});
@@ -204,8 +214,8 @@ validate_body(Body, #{bodyConstraints := BC, description := Descr}, Ctx) when is
             merge_contexts(Ctx2, Ctx, Descr)
     end;
 
-validate_body(Body, #{bodyConstraints := BC, description := Descr}, Ctx) when is_map(BC) ->
-    #{matchBody := BodyTemplate} = BC,
+validate_body(Body, #{response := #{body := BC}, description := Descr}, Ctx) when is_map(BC) ->
+    #{match := BodyTemplate} = BC,
 
     case template:match(BodyTemplate, Body) of
         {error, Reason} ->
