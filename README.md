@@ -24,7 +24,9 @@ Eshell V9.1.2  (abort with ^G)
 
 Just starting it does not do anything though. You need to write your
 test module and put it in the src folder before you build. Then invoke
-your test module's test function.
+your test module's test function. (So, yes, ionbeam is more of a
+library at the moment and very much a work in progress. We will see
+how it is eventually packaged up. I am open for suggestions.)
 
 Example:
 
