@@ -128,6 +128,8 @@ make_request("PUT", ConnPid, Path, Headers, Body, _C) ->
     gun:put(ConnPid, Path, Headers, Body);
 make_request("DELETE", ConnPid, Path, Headers, _Body, _C) ->
     gun:delete(ConnPid, Path, Headers);
+make_request("PATCH", ConnPid, Path, Headers, Body, _C) ->
+    gun:patch(ConnPid, Path, Headers, Body);
 make_request(Method, ConnPid, _, _, _, C) ->
     gun:close(ConnPid),
     throw({error, {http_method_not_implemented, Method}, C}).
