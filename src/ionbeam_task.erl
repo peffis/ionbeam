@@ -23,7 +23,8 @@
          }).
 
 
-
+create({sleep, _T} = SleepTask) ->
+    SleepTask;
 create(TaskData) ->
     apply_defaults(TaskData).
 
@@ -68,6 +69,10 @@ show_result(Indentation, TupleList) when is_list(Indentation), is_list(TupleList
 %% execute runs a task given a context, if successful it returns the new context or throws an {error, Reason, Stack} tuple
 execute(T) ->
     execute(T, #{}).
+
+execute({sleep, T}, Context) ->
+    timer:sleep(T),
+    Context;
 
 execute(T, Context) ->
     Desc = maps:get(description, T),
