@@ -153,7 +153,10 @@ stream_file(_StreamRef, _ConnPid, {error, Reason}) ->
 stream_file(StreamRef, ConnPid, {ok, IoDevice}) ->
     stream_file(StreamRef, ConnPid, IoDevice, file:read(IoDevice, 1024)).
 
-stream_file(StreamRef, ConnPid, IoDevice, {ok, Data}) when is_binary(Data) ->
+stream_file(StreamRef, ConnPid, IoDevice, {ok, Data}) when is_binary(Data), size(Data) < 1024 ->
+    gun:data(ConnPid, StreamRef, fin, Data),
+    ok;
+stream_file(StreamRef, ConnPid, IoDevice, {ok, Data}) when is_binary(Data), size(Data) == 1024 ->
     gun:data(ConnPid, StreamRef, nofin, Data),
     stream_file(StreamRef, ConnPid, IoDevice, file:read(IoDevice, 1024));
 stream_file(StreamRef, ConnPid, _IoDevice, eof)  ->
