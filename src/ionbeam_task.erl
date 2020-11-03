@@ -90,8 +90,8 @@ execute(T, Context) ->
         end
 
     catch
-        error:Reason ->
-            lager:error("stack: ~p", [erlang:get_stacktrace()]),
+        error:Reason:Stacktrace ->
+            lager:error("stack: ~p", [Stacktrace]),
             throw({error, Reason, [{Desc, Context}]})
     end.
 
@@ -108,7 +108,10 @@ execute_task(#{request := Request}, C) ->
     Port = list_to_integer(template:replace(PortTemplate, C)),
     Path = template:replace(PathTemplate, C),
     Headers = template:replace(HeadersTemplate, C),
-    Body = template:replace(BodyTemplate, C),
+    Body = case BodyTemplate of
+               {file, _} -> BodyTemplate;
+               _ -> template:replace(BodyTemplate, C)
+           end,
     Method = template:replace(MethodTemplate, C),
 
     do_request(Method, Host, Port, Path, Headers, Body, C).
@@ -127,6 +130,10 @@ do_request(Method, Host, Port, Path, Headers, Body, C) ->
 
 make_request("GET", ConnPid, Path, Headers, _Body, _C) ->
     gun:get(ConnPid, Path, Headers);
+make_request("POST", ConnPid, Path, Headers, {file, Fname}, _C) ->
+    StreamRef = gun:post(ConnPid, Path, Headers),
+    ok = stream_file(StreamRef, ConnPid, Fname),
+    StreamRef;
 make_request("POST", ConnPid, Path, Headers, Body, _C) ->
     gun:post(ConnPid, Path, Headers, Body);
 make_request("PUT", ConnPid, Path, Headers, Body, _C) ->
@@ -138,6 +145,22 @@ make_request("PATCH", ConnPid, Path, Headers, Body, _C) ->
 make_request(Method, ConnPid, _, _, _, C) ->
     gun:close(ConnPid),
     throw({error, {http_method_not_implemented, Method}, C}).
+
+stream_file(StreamRef, ConnPid, Fname) when is_list(Fname) ->
+    stream_file(StreamRef, ConnPid, file:open(Fname, [read, binary]));
+stream_file(_StreamRef, _ConnPid, {error, Reason}) ->
+    Reason;
+stream_file(StreamRef, ConnPid, {ok, IoDevice}) ->
+    stream_file(StreamRef, ConnPid, IoDevice, file:read(IoDevice, 1024)).
+
+stream_file(StreamRef, ConnPid, IoDevice, {ok, Data}) when is_binary(Data) ->
+    gun:data(StreamRef, ConnPid, nofin, Data),
+    stream_file(StreamRef, ConnPid, IoDevice, file:read(IoDevice, 1024));
+stream_file(StreamRef, ConnPid, _IoDevice, eof)  ->
+    gun:data(StreamRef, ConnPid, fin, <<"">>),
+    ok;
+stream_file(_StreamRef, _ConnPid, _IoDevice, {error, Reason}) ->
+    Reason.
 
 
 
