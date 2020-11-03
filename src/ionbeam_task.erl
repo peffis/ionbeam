@@ -157,7 +157,7 @@ stream_file(StreamRef, ConnPid, IoDevice, {ok, Data}) when is_binary(Data) ->
     gun:data(ConnPid, StreamRef, nofin, Data),
     stream_file(StreamRef, ConnPid, IoDevice, file:read(IoDevice, 1024));
 stream_file(StreamRef, ConnPid, _IoDevice, eof)  ->
-    gun:data(ConnPid, StreamRef, fin, <<"">>),
+    gun:data(ConnPid, StreamRef, fin, []),
     ok;
 stream_file(_StreamRef, _ConnPid, _IoDevice, {error, Reason}) ->
     Reason.
