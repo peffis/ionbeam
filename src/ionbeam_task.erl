@@ -153,7 +153,7 @@ stream_file(_StreamRef, _ConnPid, {error, Reason}) ->
 stream_file(StreamRef, ConnPid, {ok, IoDevice}) ->
     stream_file(StreamRef, ConnPid, IoDevice, file:read(IoDevice, 1024)).
 
-stream_file(StreamRef, ConnPid, IoDevice, {ok, Data}) when is_binary(Data), size(Data) < 1024 ->
+stream_file(StreamRef, ConnPid, _IoDevice, {ok, Data}) when is_binary(Data), size(Data) < 1024 ->
     gun:data(ConnPid, StreamRef, fin, Data),
     ok;
 stream_file(StreamRef, ConnPid, IoDevice, {ok, Data}) when is_binary(Data), size(Data) == 1024 ->
@@ -199,7 +199,7 @@ receive_data(ConnPid, Status, Headers, StreamRef, Res) ->
 convert_headers(Headers) ->
     lists:map(fun({BinKey, BinVal}) ->
                       H = <<BinKey/binary, ": ", BinVal/binary, "\r\n\r\n">>,
-                      {ok, {http_header, _, Key, undefined, Val}, <<"\r\n">>} =
+                      {ok, {http_header, _, Key, _, Val}, <<"\r\n">>} =
                           erlang:decode_packet(httph, H, []),
                       decode_key(Key) ++ ": " ++ decode_value(Val)
               end, Headers).
@@ -312,13 +312,14 @@ merge_contexts(Addition, Current, Descr) ->
 
 
 parse_headers(Headers) ->
-    parse_headers_internal(erlang:decode_packet(httph, list_to_binary(Headers), []), []).
+    DecodedPacket = erlang:decode_packet(httph, list_to_binary(Headers), []),
+    parse_headers_internal(DecodedPacket, []).
 
 
 parse_headers_internal({ok,http_eoh,<<>>}, Result) ->
     lists:reverse(Result);
 
-parse_headers_internal({ok, {http_header, _, Key, undefined, Value}, Rest}, Result) ->
+parse_headers_internal({ok, {http_header, _, Key, _, Value}, Rest}, Result) ->
     parse_headers_internal(erlang:decode_packet(httph, Rest, []),
                            [{encode_key(Key), encode_value(Value)} | Result]).
 
