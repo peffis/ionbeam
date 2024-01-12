@@ -123,7 +123,8 @@ execute_task(#{request := Request}, C) ->
 do_request(Method, Host, Port, Path, Headers, Body, C) ->
     lager:info("     request: ~s ~s://~s:~p~s",
                [Method, case Port of 80 -> "http";_ -> "https" end, Host, Port, Path]),
-    {ok, ConnPid} = gun:open(Host, Port),
+    TLSOpts = [{verify, verify_peer}, {cacerts, public_key:cacerts_get()}],
+    {ok, ConnPid} = gun:open(Host, Port, #{tls_opts => TLSOpts}),
     ParsedHeaders = parse_headers(Headers),
     StreamRef = make_request(Method, ConnPid, Path, ParsedHeaders, Body, C),
     receive_response(StreamRef).
